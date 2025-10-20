@@ -1,16 +1,10 @@
-pixeldew-assets/
-│
-├── logo/
-│   └── PD-New.png
-│
-├── audio/
-│   └── tropical_chill_acoustic.mp3
-│
-├── video-scenes/
-│   ├── scene1_beach.png
-│   ├── scene2_ubud.png
-│   ├── scene3_temple.png
-│   ├── scene4_canggu.png
-│   └── scene5_cta.png
-│
-└── README.md
+# 🌴 PixelDew Public Assets
+
+Public asset library for PixelDew projects — including logos, music, and visual scenes for Canva AI, Jules, and Creatomate.
+
+---
+
+## 🔗 Public File URLs
+After uploading, click each file → click the **“Raw”** button → copy the direct URL.
+Example:
+
