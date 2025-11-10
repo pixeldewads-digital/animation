@@ -144,5 +144,60 @@
             });
         });
     </script>
+    <script>
+  // Pastikan file meta.svg ada di root atau sesuaikan path-nya
+  const logoPath = './meta.svg';
+
+  // Saat halaman dimuat, tampilkan logo di header
+  window.addEventListener('DOMContentLoaded', async () => {
+    const imgEl = document.querySelector('img[alt="Meta Logo"]');
+    if (imgEl) {
+      imgEl.src = logoPath;
+    }
+  });
+
+  // Fungsi untuk memuat logo sebagai data URL (untuk PDF)
+  async function getLogoBase64() {
+    try {
+      const res = await fetch(logoPath);
+      const blob = await res.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      console.error('Gagal memuat logo Meta:', e);
+      return null;
+    }
+  }
+
+  // Tambahkan ke fungsi exportToPDF
+  async function exportToPDF(idx) {
+    const r = store[idx];
+    if (!window.jspdf) {
+      showToast('jsPDF belum termuat', 'error');
+      return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const marginX = 56;
+    let y = 64;
+
+    // Tambahkan logo dari repo
+    const logoData = await getLogoBase64();
+    if (logoData) {
+      doc.addImage(logoData, 'SVG', marginX, y - 20, 40, 40);
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('Meta Platforms Ireland Limited', marginX + 50, y);
+
+    // ...lanjutkan bagian PDF seperti biasa
+  }
+</script>
 </body>
 </html>
