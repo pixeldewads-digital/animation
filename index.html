@@ -94,9 +94,19 @@
             const transactionId = 'txn_' + new Date().getTime();
             document.getElementById('transaction_id').value = transactionId;
 
+            function formatDate(dateString) {
+                const date = new Date(dateString);
+                const day = date.getDate();
+                const month = date.toLocaleString('default', { month: 'short' });
+                const year = date.getFullYear();
+                const hours = date.getHours().toString().padStart(2, '0');
+                const minutes = date.getMinutes().toString().padStart(2, '0');
+                return `${day} ${month} ${year} ${hours}.${minutes}`;
+            }
+
             const formData = {
                 accountId: document.getElementById('account_id').value,
-                date: document.getElementById('date').value,
+                date: formatDate(document.getElementById('date').value),
                 paymentMethod: document.getElementById('payment_method').value === 'Lainnya' ? document.getElementById('payment_method_other').value : document.getElementById('payment_method').value,
                 transactionId: transactionId,
                 productType: document.getElementById('product_type').value,
@@ -108,32 +118,53 @@
 
             const invoiceOutput = document.getElementById('invoice-output');
             invoiceOutput.innerHTML = `
-                <div class="bg-white p-8 rounded-lg shadow-md mt-8">
-                    <div class="flex justify-between items-center mb-6">
-                        <h2 class="text-3xl font-bold text-gray-800">Invoice</h2>
-                        <div class="text-2xl font-bold text-gray-700">Meta</div>
-                    </div>
-                    <div class="border-b-2 border-gray-200 pb-6 mb-6">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-gray-600"><strong>Account ID:</strong> ${formData.accountId}</p>
-                                <p class="text-gray-600"><strong>Date:</strong> ${formData.date}</p>
-                                <p class="text-gray-600"><strong>Payment Method:</strong> ${formData.paymentMethod}</p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-gray-600"><strong>Transaction ID:</strong> ${formData.transactionId}</p>
-                                <p class="text-gray-600"><strong>Product Type:</strong> ${formData.productType}</p>
-                                <p class="text-gray-600"><strong>Status:</strong> <span class="font-semibold text-green-500">${formData.status}</span></p>
-                            </div>
+                <div class="bg-white p-12 rounded-lg shadow-lg max-w-4xl mx-auto my-8 font-sans">
+                    <!-- Header -->
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <p class="text-3xl font-bold text-gray-800">Receipt for ${formData.description}</p>
+                            <p class="text-gray-500 text-sm">ID Akun: ${formData.accountId}</p>
+                        </div>
+                        <div class="text-3xl font-bold text-blue-600 flex items-center">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/a/ab/Meta-Logo.svg" alt="Meta Logo" class="w-28">
                         </div>
                     </div>
-                    <div>
-                        <p class="text-gray-600"><strong>Amount:</strong> <span class="text-xl font-bold text-gray-800">${formData.amount}</span></p>
-                        <p class="text-gray-600 mt-2"><strong>Description:</strong> ${formData.description}</p>
-                        <p class="text-gray-600 mt-2"><strong>Notes:</strong> ${formData.notes}</p>
+                    <div class="border-t border-gray-200 my-6"></div>
+
+                    <!-- Body -->
+                    <div class="flex justify-between">
+                        <!-- Left Column -->
+                        <div class="space-y-6 text-sm text-gray-600">
+                            <div>
+                                <p class="font-semibold text-gray-700">Tanggal Invoice/Pembayaran</p>
+                                <p class="font-bold text-gray-800">${formData.date}</p>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-gray-700">Metode Pembayaran</p>
+                                <p class="font-bold text-gray-800">${formData.paymentMethod}</p>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-gray-700">ID Transaksi</p>
+                                <p class="font-bold text-gray-800">${formData.transactionId}</p>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-gray-700">Jenis Produk</p>
+                                <p class="font-bold text-gray-800">${formData.productType}</p>
+                            </div>
+                        </div>
+
+                        <!-- Right Column -->
+                        <div class="text-right">
+                            <p class="text-lg font-semibold text-gray-800">${formData.status}</p>
+                            <p class="text-5xl font-bold text-gray-900 mt-2">${formData.amount} IDR</p>
+                            <p class="text-sm text-gray-500 mt-2">${formData.notes}</p>
+                        </div>
                     </div>
-                    <div class="mt-8 text-right">
-                        <button id="download-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200">Download PDF</button>
+
+                    <div class="border-t border-gray-200 my-8"></div>
+
+                    <div class="text-center mt-8">
+                        <button id="download-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200">Download PDF</button>
                     </div>
                 </div>
             `;
