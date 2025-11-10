@@ -199,5 +199,30 @@
     // ...lanjutkan bagian PDF seperti biasa
   }
 </script>
+    <script>
+  // Fungsi generate ID transaksi numerik penuh
+  function genTxId() {
+    const length = 16; // jumlah digit
+    let id = '';
+    for (let i = 0; i < length; i++) {
+      id += Math.floor(Math.random() * 10);
+    }
+    return id;
+  }
+
+  // Auto-generate ID saat halaman dimuat
+  window.addEventListener('DOMContentLoaded', () => {
+    const txInput = document.getElementById('transaction_id');
+    if (txInput) txInput.value = genTxId();
+
+    // Regenerate setiap kali form disubmit
+    document.getElementById('invoice-form').addEventListener('submit', () => {
+      setTimeout(() => {
+        txInput.value = genTxId();
+      }, 100);
+    });
+  });
+</script>
+
 </body>
 </html>
