@@ -1,112 +1,209 @@
-<!doctype html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Meta-Style Invoice/Receipt Generator</title>
-  <!-- Inter font -->
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <style>
-    body { box-sizing: border-box; font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'; }
-    @keyframes slideIn { from{opacity:0; transform:translateY(-10px)} to{opacity:1; transform:translateY(0)} }
-    .toast { animation: slideIn .3s ease-out; }
-  </style>
-</head>
-<body class="min-h-full bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-  <div class="max-w-4xl mx-auto">
-    <!-- Header / Brand -->
-    <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
-      <div class="flex items-center gap-3 mb-2">
-        <!-- Logo Meta SVG Only -->
-        <img src="meta.svg" alt="Meta Logo" class="w-12 h-12"/>
-      </div>
-      <div class="h-px bg-gray-200 mt-4"></div>
+<!-- App Logic -->
+<script>
+  // ===== STATE =====
+  const store = [];
 
-      <!-- Toast -->
-      <div id="toast" class="hidden mt-4 mb-2 p-4 rounded-lg"></div>
+  // ===== HELPERS =====
+  function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    toast.className = `toast mt-4 mb-2 p-4 rounded-lg ${type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+    toast.textContent = message;
+    toast.classList.remove('hidden');
+    setTimeout(() => toast.classList.add('hidden'), 2500);
+  }
 
-      <!-- Form -->
-      <form id="invoice-form" class="space-y-6 mt-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <!-- Kiri -->
-          <div class="space-y-4">
-            <h2 class="text-lg font-semibold text-gray-700">Detail Invoice</h2>
-            <div>
-              <label for="client_name" class="block text-sm font-medium text-gray-700 mb-1">Billed To</label>
-              <input id="client_name" name="client_name" type="text" required placeholder="Nama Perusahaan / Klien" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+  function money(v){
+    const s = (v||'').toString().replace(/[^0-9]/g, '');
+    if(!s) return 'Rp0';
+    return 'Rp' + s.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  function fmtDate(dt){
+    try{
+      const d = new Date(dt);
+      const dd = d.toLocaleDateString('id-ID', { day:'numeric', month:'short', year:'numeric' }).replace('.', '');
+      const tt = d.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', hour12:false });
+      return `${dd} ${tt}`;
+    }catch(e){ return String(dt); }
+  }
+
+  // Full numeric transaction ID (16 digits)
+  function genTxId() {
+    const length = 16; let id = '';
+    for (let i = 0; i < length; i++) id += Math.floor(Math.random() * 10);
+    return id;
+  }
+
+  // ===== RENDER LIST =====
+  function render(){
+    const list = document.getElementById('invoice-list');
+    if(!list) return;
+    if(!store.length){
+      list.innerHTML = '<p class="text-gray-500 text-center py-8">Belum ada data. Buat receipt pertama Anda!</p>';
+      return;
+    }
+    const items = store.map((r, idx) => `
+      <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200" data-idx="${idx}">
+        <div class="flex justify-between items-start gap-4">
+          <div class="flex-1">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="font-semibold text-gray-800">${(r.description||'Receipt')}</span>
+              <span class="text-sm text-gray-500">•</span>
+              <span class="text-sm text-gray-600">${r.client_name||'-'}</span>
             </div>
-            <div>
-              <label for="account_id" class="block text-sm font-medium text-gray-700 mb-1">ID Akun</label>
-              <input id="account_id" name="account_id" type="text" placeholder="695566674863880" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-            </div>
-            <div>
-              <label for="date" class="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
-              <input id="date" name="date" type="datetime-local" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-            </div>
-            <div>
-              <label for="payment_method" class="block text-sm font-medium text-gray-700 mb-1">Metode Pembayaran</label>
-              <select id="payment_method" name="payment_method" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                <option value="Kartu Kredit (Visa/Mastercard/Amex)">Kartu Kredit (Visa/Mastercard/Amex)</option>
-                <option value="Kartu Debit">Kartu Debit</option>
-                <option value="PayPal">PayPal</option>
-                <option value="Direct Debit (ACH/SEPA)">Direct Debit (ACH/SEPA)</option>
-                <option value="Bank Transfer / Manual Top-Up">Bank Transfer / Manual Top-Up</option>
-                <option value="Online Banking">Online Banking</option>
-                <option value="Facebook Ad Coupon / Credit">Facebook Ad Coupon / Credit</option>
-                <option value="Lainnya">Lainnya…</option>
-              </select>
-              <input id="payment_method_other" type="text" placeholder="Metode lain (isi manual)" class="mt-2 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent hidden" />
-            </div>
-            <div>
-              <label for="transaction_id" class="block text-sm font-medium text-gray-700 mb-1">ID Transaksi</label>
-              <input id="transaction_id" name="transaction_id" type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700" readonly />
-            </div>
-            <div>
-              <label for="product_type" class="block text-sm font-medium text-gray-700 mb-1">Jenis Produk</label>
-              <input id="product_type" name="product_type" type="text" value="Meta iklan" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            <div class="flex gap-4 text-sm text-gray-500 flex-wrap">
+              <span>📅 ${fmtDate(r.date)}</span>
+              <span>💳 ${r.payment_method||'-'}</span>
+              <span>🆔 ${r.transaction_id||'-'}</span>
             </div>
           </div>
-          <!-- Kanan -->
-          <div class="space-y-4">
-            <h2 class="text-lg font-semibold text-gray-700">Nilai & Status</h2>
-            <div>
-              <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select id="status" name="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                <option>Didanai</option>
-                <option>Tertunda</option>
-                <option>Dibatalkan</option>
-              </select>
-            </div>
-            <div>
-              <label for="amount" class="block text-sm font-medium text-gray-700 mb-1">Jumlah (contoh: Rp2.500.000)</label>
-              <input id="amount" name="amount" type="text" required placeholder="Rp2.500.000" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-            </div>
-            <div>
-              <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Deskripsi</label>
-              <textarea id="description" name="description" rows="4" placeholder="Receipt for Kemilau Spa" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
-            </div>
-            <div>
-              <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">Catatan (opsional)</label>
-              <input id="notes" name="notes" type="text" placeholder="Tidak ada alasan yang tersedia." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-            </div>
+          <div class="flex items-center gap-3">
+            <span class="text-gray-900">${money(r.amount)}</span>
+            <button class="text-blue-600 hover:text-blue-800 font-medium text-sm px-3 py-1 rounded hover:bg-blue-50 transition" onclick="exportToPDF(${idx})">PDF</button>
+            <button class="text-red-500 hover:text-red-700 font-medium text-sm px-3 py-1 rounded hover:bg-red-50 transition" onclick="delItem(${idx})">Hapus</button>
           </div>
         </div>
-
-        <button type="submit" id="submit-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 shadow-md hover:shadow-lg">Tambah ke Daftar</button>
-      </form>
-    </div>
-
-    <!-- List -->
-    <div class="bg-white rounded-lg shadow-lg p-8">
-      <h2 class="text-xl font-bold text-gray-800 mb-4">Daftar Receipt</h2>
-      <div id="invoice-list" class="space-y-3">
-        <p class="text-gray-500 text-center py-8">Belum ada data. Buat receipt pertama Anda!</p>
       </div>
-    </div>
-  </div>
-</body>
-</html>
+    `).join('');
+    list.innerHTML = items;
+  }
+
+  function delItem(idx){
+    store.splice(idx,1);
+    render();
+    showToast('Data dihapus','success');
+  }
+
+  // ===== INIT & FORM HANDLER =====
+  window.addEventListener('DOMContentLoaded', () => {
+    const dateEl = document.getElementById('date');
+    if (dateEl) dateEl.value = new Date().toISOString().slice(0,16);
+    const txInput = document.getElementById('transaction_id');
+    if (txInput) txInput.value = genTxId();
+
+    const paySel = document.getElementById('payment_method');
+    const payOther = document.getElementById('payment_method_other');
+    if (paySel && payOther) {
+      paySel.addEventListener('change', ()=>{
+        if ((paySel.value || '').trim().toLowerCase() === 'lainnya') payOther.classList.remove('hidden');
+        else { payOther.classList.add('hidden'); payOther.value=''; }
+      });
+    }
+
+    const form = document.getElementById('invoice-form');
+    if (form) {
+      form.addEventListener('submit', (e)=>{
+        e.preventDefault();
+        const f = new FormData(form);
+        const chosenPayment = (()=> {
+          const v = (f.get('payment_method')||'').toString();
+          if (v.trim().toLowerCase() === 'lainnya') return (document.getElementById('payment_method_other')?.value || 'Lainnya');
+          return v;
+        })();
+
+        const data = {
+          client_name: f.get('client_name') || '',
+          account_id: f.get('account_id') || '',
+          date: f.get('date') || new Date().toISOString().slice(0,16),
+          payment_method: chosenPayment,
+          transaction_id: (document.getElementById('transaction_id')?.value || genTxId()),
+          product_type: f.get('product_type') || 'Meta iklan',
+          status: f.get('status') || 'Didanai',
+          amount: f.get('amount') || '0',
+          description: f.get('description') || 'Receipt',
+          notes: f.get('notes') || ''
+        };
+
+        store.push(data);
+        render();
+        showToast('Receipt ditambahkan','success');
+
+        // reset untuk entri berikutnya
+        form.reset();
+        if (dateEl) dateEl.value = new Date().toISOString().slice(0,16);
+        if (txInput) txInput.value = genTxId();
+        const pt = document.getElementById('product_type'); if (pt) pt.value = 'Meta iklan';
+      });
+    }
+
+    render();
+  });
+
+  // ===== PDF EXPORT =====
+  async function getLogoBase64() {
+    try {
+      const res = await fetch('meta.svg');          // pastikan meta.svg ada di folder yang sama
+      const blob = await res.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      console.warn('Logo tidak ditemukan/gagal dimuat:', e);
+      return null;
+    }
+  }
+
+  async function exportToPDF(idx){
+    const r = store[idx];
+    if (!r) return;
+    if (!window.jspdf) { showToast('jsPDF belum termuat','error'); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const marginX = 56; let y = 64;
+
+    // Logo (SVG). Jika gagal, lanjut tanpa logo.
+    const logoData = await getLogoBase64();
+    if (logoData) {
+      try { doc.addImage(logoData, 'SVG', marginX, y-20, 40, 40); } catch {}
+    }
+
+    // Garis pemisah header
+    doc.setDrawColor(220,220,220); doc.line(marginX, y+8, pageW - marginX, y+8); y += 32;
+
+    // Judul kiri
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(33,33,33);
+    doc.text(`Receipt for ${r.client_name}`, marginX, y);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(90,90,90);
+    if (r.account_id) doc.text(`Account ID: ${r.account_id}`, marginX, y+16);
+
+    // Kanan: status + amount (amount kecil & tidak bold)
+    doc.setFont('helvetica','normal'); doc.setFontSize(12); doc.setTextColor(90,90,90);
+    doc.text(String(r.status||'Funded'), pageW - marginX, y, {align:'right'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(16); doc.setTextColor(30,30,30);
+    doc.text(`${money(r.amount)} IDR`, pageW - marginX, y+22, {align:'right'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(150,150,150);
+    if (r.notes) doc.text(r.notes, pageW - marginX, y+36, {align:'right'});
+
+    // Detail
+    y += 64;
+    const rows = [
+      ['Invoice/Payment Date', fmtDate(r.date)],
+      ['Payment Method', (r.payment_method||'').toString().trim()],
+      ['Transaction ID', r.transaction_id],
+      ['Product', r.product_type||'Meta ads']
+    ];
+    rows.forEach((row,i)=>{
+      const yy = y + i*34;
+      doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(110,110,110);
+      doc.text(row[0], marginX, yy);
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(33,33,33);
+      doc.text(String(row[1]), marginX, yy+16);
+    });
+
+    // Footer
+    doc.setDrawColor(220,220,220); doc.line(marginX, 760, pageW - marginX, 760);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(150,150,150);
+    doc.text('This document is an internal bookkeeping copy.', pageW/2, 780, {align:'center'});
+
+    const safeClient = (r.client_name||'client').replace(/[^\w\-]+/g,'_');
+    doc.save(`Receipt-${safeClient}-${Date.now()}.pdf`);
+  }
+
+  // expose for buttons
+  window.exportToPDF = exportToPDF;
+  window.delItem = delItem;
+</script>
